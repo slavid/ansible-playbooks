@@ -1,0 +1,22 @@
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Bind docker daemon to port 2375
+      lineinfile:
+        path: /usr/lib/systemd/system/docker.service
+        state: present
+        regex: '^ExecStart='
+        line: 'ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock -H tcp://0.0.0.0:2375'
+      register: file_change
+
+    - name: Reload Daemon
+      systemd:
+        daemon_reload: true
+      when: file_change.changed
+
+    - name: Restart Docker
+      service:
+        name: docker
+        state: restarted
+      when: file_change.changed
