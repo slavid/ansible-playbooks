@@ -1,0 +1,38 @@
+- hosts: localhost
+  connection: local
+  vars:
+    file_to_edit: /usr/lib/systemd/system/docker.service
+    text_to_add: "-H tcp:\/\/0.0.0.0:2375"
+  become: yes
+  tasks:
+
+    - name: Is docker daemon already bind to port 2375
+      ansible.builtin.command: /bin/grep "\{{ text_to_add }}" '{{ file_to_edit }}'
+      ignore_errors: true
+      register: result
+      failed_when: "result.rc == 1"
+      #changed_when: true
+      #check_mode: no
+
+
+    - name: Bind docker daemon to port 2375
+      lineinfile:
+        path: '{{ file_to_edit }}'
+        state: present
+        backrefs: true
+        regex: '^ExecStart=(.*)'
+        line: 'ExecStart=\1 {{  text_to_add }}'
+      when: result is failed
+      register: file_change
+
+    # - name: Reload Daemon
+    #   systemd:
+    #     daemon_reload: true
+    #   when: file_change.changed
+
+    - name: Restart Docker
+      systemd:
+        daemon_reload: true
+        name: docker
+        state: restarted
+      when: file_change.changed
